@@ -1,7 +1,9 @@
-# fly.toml app configuration file
-# See https://fly.io/docs/reference/configuration/ for more information
+# fly.toml app configuration file generated for ghwk on 2025-10-25T18:38:02Z
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
 
-app = 'dreamina-api'
+app = 'ghwk'
 primary_region = 'iad'
 
 [build]
@@ -14,14 +16,8 @@ primary_region = 'iad'
   min_machines_running = 0
   processes = ['app']
 
-  [[http_service.checks]]
-    grace_period = '10s'
-    interval = '30s'
-    method = 'GET'
-    timeout = '5s'
-    path = '/health'
-
 [[vm]]
   memory = '1gb'
   cpu_kind = 'shared'
   cpus = 1
+  memory_mb = 1024
