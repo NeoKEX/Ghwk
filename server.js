@@ -3,7 +3,7 @@ const express = require('express');
 const puppeteer = require('puppeteer');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3000;
 
 let browser = null;
 let page = null;
@@ -12,8 +12,19 @@ let isLoggedIn = false;
 async function initializeBrowser() {
   console.log('Initializing browser...');
   
+  const { execSync } = require('child_process');
+  let chromiumPath = null;
+  
+  try {
+    chromiumPath = execSync('which chromium').toString().trim();
+    console.log(`Using system Chromium at: ${chromiumPath}`);
+  } catch (e) {
+    console.log('Using bundled Chromium from Puppeteer');
+  }
+  
   const launchOptions = {
     headless: 'new',
+    executablePath: chromiumPath,
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
