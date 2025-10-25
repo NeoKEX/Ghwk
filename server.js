@@ -13,18 +13,36 @@ async function initializeBrowser() {
   console.log('Initializing browser...');
   
   const { execSync } = require('child_process');
+  const fs = require('fs');
   let chromiumPath = null;
   
-  try {
-    chromiumPath = execSync('which chromium').toString().trim();
-    console.log(`Using system Chromium at: ${chromiumPath}`);
-  } catch (e) {
-    console.log('Using bundled Chromium from Puppeteer');
+  const possiblePaths = [
+    '/usr/bin/chromium',
+    '/usr/bin/chromium-browser',
+    '/usr/bin/google-chrome-stable',
+    '/usr/bin/google-chrome'
+  ];
+  
+  for (const path of possiblePaths) {
+    if (fs.existsSync(path)) {
+      chromiumPath = path;
+      console.log(`Found Chromium at: ${chromiumPath}`);
+      break;
+    }
+  }
+  
+  if (!chromiumPath) {
+    try {
+      chromiumPath = execSync('which chromium').toString().trim();
+      console.log(`Using system Chromium at: ${chromiumPath}`);
+    } catch (e) {
+      console.log('Using bundled Chromium from Puppeteer');
+    }
   }
   
   const launchOptions = {
     headless: 'new',
-    executablePath: chromiumPath,
+    executablePath: chromiumPath || undefined,
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
