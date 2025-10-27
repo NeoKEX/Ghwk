@@ -463,7 +463,7 @@ async function generateImage(prompt, modelName) {
     const checkResult = await page.evaluate((promptText, existingUrls) => {
       const allImages = Array.from(document.querySelectorAll('img'));
       
-      // Filter for NEW large content images
+      // Filter for NEW large content images IN THE TOP SECTION ONLY
       const newContentImages = allImages.filter(img => {
         const src = img.src || '';
         const rect = img.getBoundingClientRect();
@@ -481,6 +481,10 @@ async function generateImage(prompt, modelName) {
         
         // Must be visible
         if (rect.width === 0 || rect.height === 0) return false;
+        
+        // CRITICAL: Only count images in the TOP section (generated results area)
+        // This excludes the 36 gallery images below
+        if (rect.top > 600) return false;
         
         return true;
       });
@@ -542,6 +546,11 @@ async function generateImage(prompt, modelName) {
         // Must be large and visible
         if (rect.width < 180 || rect.height < 180) return false;
         if (rect.width === 0 || rect.height === 0) return false;
+        
+        // CRITICAL: Only look at images in the TOP section of the page
+        // Generated images appear at the top, gallery images are below
+        // Limit to images in the top 600px of the viewport
+        if (rect.top > 600) return false;
         
         return true;
       });
