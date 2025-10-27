@@ -347,22 +347,47 @@ async function generateImage(prompt, modelName) {
   
   console.log(`Generating with ${modelName}: ${prompt}`);
   
-  // Use client-side navigation to /ai-tool/generate to avoid redirects
-  console.log('Step 1: Navigating to /ai-tool/generate using client-side routing...');
+  // Click on "Create" or "AI Image" to navigate to the generate page
+  console.log('Step 1: Clicking Create button to navigate to generate page...');
   
   try {
-    // Use JavaScript to navigate within the SPA instead of page.goto
-    await page.evaluate(() => {
-      window.history.pushState({}, '', '/ai-tool/generate');
-      // Trigger a navigation event that the SPA framework will listen to
-      window.dispatchEvent(new PopStateEvent('popstate'));
+    const clicked = await page.evaluate(() => {
+      // Look for Create navigation button
+      const navButtons = Array.from(document.querySelectorAll('[role="menuitem"], button, a, div[class*="menu"]'));
+      
+      for (const btn of navButtons) {
+        const text = (btn.textContent || '').trim();
+        const ariaLabel = (btn.getAttribute('aria-label') || '');
+        
+        // Look for "Create" nav item
+        if (text === 'Create' || ariaLabel.includes('Create')) {
+          btn.click();
+          return { success: true, text: 'Create' };
+        }
+      }
+      
+      // If no Create button, look for "AI Image"
+      for (const btn of navButtons) {
+        const text = (btn.textContent || '').trim();
+        if (text.includes('AI Image')) {
+          btn.click();
+          return { success: true, text: 'AI Image' };
+        }
+      }
+      
+      return { success: false };
     });
     
-    await delay(3000);
+    if (clicked.success) {
+      console.log(`✅ Clicked "${clicked.text}" navigation`);
+      await delay(4000); // Wait for page to load
+    } else {
+      console.log('⚠️ Could not find Create button, staying on current page');
+      await delay(2000);
+    }
     
     const currentUrl = page.url();
-    console.log(`Current URL after client-side navigation: ${currentUrl}`);
-    
+    console.log(`Current URL: ${currentUrl}`);
     console.log('✅ Page ready for generation');
   } catch (navError) {
     console.log('⚠️ Navigation failed:', navError.message);
