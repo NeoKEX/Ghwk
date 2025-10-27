@@ -356,15 +356,44 @@ async function generateImage(prompt, modelName) {
       timeout: 30000 
     });
     console.log('✅ Loaded generate page');
-    await delay(2000);
+    await delay(3000);
   } catch (navError) {
     console.log('⚠️ Navigation failed:', navError.message);
     throw new Error('Unable to load generate page');
   }
   
-  // Step 2: Wait for gallery images to load, THEN take baseline
-  console.log('Step 2: Waiting for page gallery to fully load...');
-  await delay(5000); // Wait 5 seconds for trending/gallery images to load
+  // Step 2: Verify we're still logged in on this page
+  console.log('Step 2: Verifying login state on generate page...');
+  const loginCheck = await page.evaluate(() => {
+    const bodyText = document.body.textContent || '';
+    const bodyHTML = document.body.innerHTML || '';
+    
+    return {
+      hasLoginButton: bodyText.includes('Log in') || bodyText.includes('Sign in'),
+      hasPromptInput: document.querySelector('textarea') !== null,
+      hasCreateNav: bodyText.includes('Create') || bodyText.includes('Explore'),
+      url: window.location.href,
+      bodyPreview: bodyText.substring(0, 200)
+    };
+  });
+  
+  console.log('Login check:', JSON.stringify(loginCheck, null, 2));
+  
+  if (loginCheck.hasLoginButton) {
+    console.log('❌ NOT LOGGED IN on generate page! Redirected to login.');
+    throw new Error('Session expired or cookies invalid - not logged in on generate page');
+  }
+  
+  if (!loginCheck.hasPromptInput) {
+    console.log('❌ No prompt input found - page may not have loaded correctly');
+    throw new Error('Generate page did not load correctly - no prompt input found');
+  }
+  
+  console.log('✅ Confirmed logged in on generate page');
+  
+  // Step 3: Wait for any dynamic gallery images to load, THEN take baseline
+  console.log('Step 3: Waiting for dynamic content to fully load...');
+  await delay(5000); // Wait for any gallery/trending images to load
   
   const existingImageUrls = await page.evaluate(() => {
     const imgs = Array.from(document.querySelectorAll('img'));
@@ -374,8 +403,8 @@ async function generateImage(prompt, modelName) {
   });
   console.log(`Found ${existingImageUrls.length} existing gallery images (will exclude these from results)`);
   
-  // Step 3: Find and fill the prompt input
-  console.log('Step 3: Entering prompt and submitting...');
+  // Step 4: Find and fill the prompt input
+  console.log('Step 4: Entering prompt and submitting...');
   
   let promptFilled = null;
   const maxPromptRetries = 5;
@@ -437,8 +466,8 @@ async function generateImage(prompt, modelName) {
   
   await delay(1500); // Wait for input to be processed
   
-  // Step 4: Submit the prompt using keyboard Enter
-  console.log('Step 4: Submitting prompt with Enter key...');
+  // Step 5: Submit the prompt using keyboard Enter
+  console.log('Step 5: Submitting prompt with Enter key...');
   
   try {
     // Press Enter to submit (Ctrl+Enter or just Enter depending on the UI)
@@ -449,8 +478,8 @@ async function generateImage(prompt, modelName) {
     console.log('⚠️ Enter key submission failed, will wait for generation anyway');
   }
   
-  // Step 5: Wait for NEW generated images to appear
-  console.log('Step 5: Waiting for NEW generated images to appear (max 30 seconds)...');
+  // Step 6: Wait for NEW generated images to appear
+  console.log('Step 6: Waiting for NEW generated images to appear (max 30 seconds)...');
   console.log('Looking for 4 newly generated images...');
   
   let imageData = null;
@@ -521,8 +550,8 @@ async function generateImage(prompt, modelName) {
     console.log('⚠️ Timeout waiting for images, attempting to extract anyway...');
   }
   
-  // Step 9: Extract ONLY the NEW generated image URLs
-  console.log('Step 9: Extracting NEW generated image URLs...');
+  // Step 7: Extract ONLY the NEW generated image URLs
+  console.log('Step 7: Extracting NEW generated image URLs...');
   
   imageData = await page.evaluate((promptText, existingUrls) => {
     const allImages = Array.from(document.querySelectorAll('img'));
@@ -614,8 +643,8 @@ async function generateImage(prompt, modelName) {
     throw new Error('No NEW generated images found - generation may have failed');
   }
   
-  // Step 10: Return the image URLs
-  console.log(`Step 10: Returning ${imageData.urls.length} NEW image URLs...`);
+  // Step 8: Return the image URLs
+  console.log(`Step 8: Returning ${imageData.urls.length} NEW image URLs...`);
   const images = imageData.urls.map((url, i) => ({
     url: url,
     index: i + 1

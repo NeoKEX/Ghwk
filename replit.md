@@ -5,7 +5,7 @@ This is a Node.js Express server that automates interactions with the Dreamina A
 
 **Current State**: Cookie-based authentication implemented. Server loads session from `account.txt` (Netscape format). 
 
-**IMPORTANT**: This server is hosted on fly.io, NOT on Replit. Replit is used only as a code editor. Do not create workflows or attempt to run the server on Replit.
+**IMPORTANT**: Production server is hosted on fly.io. Replit can be used for local testing/development, but fly.io is the production environment.
 
 ## Features
 - Cookie-based authentication (secure, persistent sessions)

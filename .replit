@@ -1,5 +1,6 @@
 run = "cowsay Configure me!"
 entrypoint = "README.md"
+modules = ["nodejs-20"]
 
 [nix]
 channel = "stable-24_11"
@@ -7,3 +8,9 @@ packages = ["cowsay"]
 
 [agent]
 expertMode = true
+
+[workflows]
+
+[[ports]]
+localPort = 8080
+externalPort = 8080
