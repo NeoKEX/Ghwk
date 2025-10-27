@@ -347,16 +347,38 @@ async function generateImage(prompt, modelName) {
   
   console.log(`Generating with ${modelName}: ${prompt}`);
   
-  // NEW APPROACH: Always go directly to the generate page
+  // NEW APPROACH: Navigate to generate page and ensure we stay there
   console.log('Step 1: Navigating directly to /ai-tool/generate page...');
   
   try {
     await page.goto('https://dreamina.capcut.com/ai-tool/generate', { 
-      waitUntil: 'networkidle2',
+      waitUntil: 'domcontentloaded',
       timeout: 30000 
     });
+    console.log('✅ Initial navigation complete');
+    await delay(3000);
+    
+    // Check if we were redirected
+    const currentUrl = page.url();
+    console.log(`Current URL: ${currentUrl}`);
+    
+    if (!currentUrl.includes('/ai-tool/generate')) {
+      console.log('⚠️ Page redirected away from /ai-tool/generate, navigating back...');
+      await page.goto('https://dreamina.capcut.com/ai-tool/generate', { 
+        waitUntil: 'domcontentloaded',
+        timeout: 30000 
+      });
+      await delay(3000);
+      
+      const finalUrl = page.url();
+      console.log(`Final URL: ${finalUrl}`);
+      if (!finalUrl.includes('/ai-tool/generate')) {
+        console.log('⚠️ Still not on /ai-tool/generate, but continuing...');
+      }
+    }
+    
     console.log('✅ Loaded generate page');
-    await delay(5000); // Increased wait time for dynamic content
+    await delay(2000);
   } catch (navError) {
     console.log('⚠️ Navigation failed:', navError.message);
     throw new Error('Unable to load generate page');
