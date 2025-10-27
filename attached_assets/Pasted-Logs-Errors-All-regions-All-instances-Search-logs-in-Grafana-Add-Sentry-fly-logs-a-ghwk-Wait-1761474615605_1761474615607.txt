@@ -1,0 +1,152 @@
+Logs & Errors
+
+All regions
+
+All instances
+Search logs in Grafana
+Add Sentry
+$ fly logs -a ghwk
+
+Waiting for logs...
+
+2025-10-26T09:57:46.660 app[148e46eea2e168] iad [info] [ 399.352069] reboot: Restarting system
+
+2025-10-26T10:27:40.845 app[148e46eea2e168] iad [info] INFO Starting init (commit: fad6f82)...
+
+2025-10-26T10:27:40.926 app[148e46eea2e168] iad [info] INFO Preparing to run: `docker-entrypoint.sh node server.js` as root
+
+2025-10-26T10:27:40.934 app[148e46eea2e168] iad [info] INFO [fly api proxy] listening at /.fly/api
+
+2025-10-26T10:27:41.056 runner[148e46eea2e168] iad [info] Machine started in 982ms
+
+2025-10-26T10:27:41.057 proxy[148e46eea2e168] iad [info] machine started in 1.053710366s
+
+2025-10-26T10:27:41.154 app[148e46eea2e168] iad [info] [dotenv@17.2.3] injecting env (0) from .env -- tip: 🔐 encrypt with Dotenvx: https://dotenvx.com
+
+2025-10-26T10:27:41.204 health[148e46eea2e168] iad [error] Health check on port 8080 has failed. Your app is not responding properly. Services exposed on ports [80, 443] will have intermittent failures until the health check passes.
+
+2025-10-26T10:27:41.260 app[148e46eea2e168] iad [info] 2025/10/26 10:27:41 INFO SSH listening listen_address=[fdaa:31:6c93:a7b:518:7905:f73f:2]:22
+
+2025-10-26T10:27:41.549 app[148e46eea2e168] iad [info] Initializing browser...
+
+2025-10-26T10:27:41.549 app[148e46eea2e168] iad [info] Found Chromium at: /usr/bin/chromium
+
+2025-10-26T10:27:41.549 app[148e46eea2e168] iad [info] Browser launch attempt 1/3...
+
+2025-10-26T10:27:41.553 app[148e46eea2e168] iad [info] 🚀 Server running on port 8080
+
+2025-10-26T10:27:41.553 app[148e46eea2e168] iad [info] Endpoints:
+
+2025-10-26T10:27:41.553 app[148e46eea2e168] iad [info] GET /generate/nano-banana?prompt=YOUR_PROMPT
+
+2025-10-26T10:27:41.553 app[148e46eea2e168] iad [info] GET /generate/image-4?prompt=YOUR_PROMPT
+
+2025-10-26T10:27:41.553 app[148e46eea2e168] iad [info] GET /health
+
+2025-10-26T10:27:41.786 proxy[148e46eea2e168] iad [info] machine became reachable in 729.118656ms
+
+2025-10-26T10:27:41.822 health[148e46eea2e168] iad [info] Health check on port 8080 is now passing.
+
+2025-10-26T10:28:11.056 app[148e46eea2e168] iad [info] ✅ Browser initialized successfully
+
+2025-10-26T10:28:11.056 app[148e46eea2e168] iad [info] Loading cookies from account.txt...
+
+2025-10-26T10:28:11.056 app[148e46eea2e168] iad [info] Loaded 11 cookies from account.txt
+
+2025-10-26T10:28:11.056 app[148e46eea2e168] iad [info] Testing network connectivity to Dreamina...
+
+2025-10-26T10:28:14.620 app[148e46eea2e168] iad [info] ✅ Network connectivity confirmed
+
+2025-10-26T10:28:14.721 app[148e46eea2e168] iad [info] ✅ Cookies set in browser
+
+2025-10-26T10:28:14.721 app[148e46eea2e168] iad [info] Navigating to Dreamina...
+
+2025-10-26T10:28:14.722 app[148e46eea2e168] iad [info] Navigation attempt 1/3 to Dreamina...
+
+2025-10-26T10:28:16.194 app[148e46eea2e168] iad [info] ✅ Navigation successful
+
+2025-10-26T10:28:16.195 app[148e46eea2e168] iad [info] Waiting for page to load...
+
+2025-10-26T10:28:16.195 app[148e46eea2e168] iad [info] Login verification attempt 1/5...
+
+2025-10-26T10:28:21.200 app[148e46eea2e168] iad [info] Check 1: {
+
+2025-10-26T10:28:21.200 app[148e46eea2e168] iad [info] "bodyLength": 0,
+
+2025-10-26T10:28:21.200 app[148e46eea2e168] iad [info] "bodyHTMLLength": 32904,
+
+2025-10-26T10:28:21.200 app[148e46eea2e168] iad [info] "hasLoginButton": false,
+
+2025-10-26T10:28:21.200 app[148e46eea2e168] iad [info] "hasCreateButton": false,
+
+2025-10-26T10:28:21.200 app[148e46eea2e168] iad [info] "hasPromptInput": false,
+
+2025-10-26T10:28:21.200 app[148e46eea2e168] iad [info] "hasCreateNav": false,
+
+2025-10-26T10:28:21.200 app[148e46eea2e168] iad [info] "bodyPreview": "",
+
+2025-10-26T10:28:21.200 app[148e46eea2e168] iad [info] "htmlPreview": "<div id=\"root\"></div><div id=\"csr-root\"></div><script id=\"__GLOBAL_VARIABLES_MAP__\" type=\"application/json\">{\"__ENV_CONFIG__.LV_WEB_VERSION\":\"LV_WEB_VERSION\",\"__ENV_CONFIG__._currentBranch\":\"_currentBranch\",\"__ENV_CONFIG__._tag\":\"_tag\",\"__GTW_BETA_TEST__.__beta_test__\":\"__beta_test__\",\"__GTW_GENERATE_MODEL_PARAMS__IMAGE__.__image_generate_model_params__\":\"__image_generate_model_params__\",\"__GTW_GENERATE_MODEL_CONFIG__IMAGE__.__image_generate_model_config__\":\"__image_generate_model_config__\",\"__G"
+
+2025-10-26T10:28:21.200 app[148e46eea2e168] iad [info] }
+
+2025-10-26T10:28:21.289 app[148e46eea2e168] iad [info] 📸 Screenshot saved to /tmp/login-debug.png for debugging
+
+2025-10-26T10:28:21.290 app[148e46eea2e168] iad [info] Content still loading, will retry...
+
+2025-10-26T10:28:21.290 app[148e46eea2e168] iad [info] Login verification attempt 2/5...
+
+2025-10-26T10:28:26.296 app[148e46eea2e168] iad [info] Check 2: {
+
+2025-10-26T10:28:26.296 app[148e46eea2e168] iad [info] "bodyLength": 417,
+
+2025-10-26T10:28:26.296 app[148e46eea2e168] iad [info] "bodyHTMLLength": 147787,
+
+2025-10-26T10:28:26.296 app[148e46eea2e168] iad [info] "hasLoginButton": false,
+
+2025-10-26T10:28:26.296 app[148e46eea2e168] iad [info] "hasCreateButton": false,
+
+2025-10-26T10:28:26.296 app[148e46eea2e168] iad [info] "hasPromptInput": true,
+
+2025-10-26T10:28:26.296 app[148e46eea2e168] iad [info] "hasCreateNav": true,
+
+2025-10-26T10:28:26.296 app[148e46eea2e168] iad [info] "bodyPreview": "Explore\nCreate\nAssets\nCanvas\nStart Creating With\nAI Image\nAI Image\nGuide with more refs\nCreate with up to 6 references\nAI Video\nFrames to video\nTurn frames into a flowing story\nAI Avatar\nRealistic avatars\nCreate realistic digital avatars\nMimic Motion\nBeta\nCapture and mimic real motion\nAI Image\nImage",
+
+2025-10-26T10:28:26.296 app[148e46eea2e168] iad [info] "htmlPreview": "<div id=\"root\"></div><div id=\"csr-root\"><div id=\"dreamina\" class=\"root-TlTGxZ\"><div class=\"top-down-layer-mDdvxq\"><div class=\"container-sMtgMc\" style=\"--side-menu-width: 76px; --side-drawer-width: 440px; --side-drawer-float-limit-width: 1280px;\"><div class=\"sideMenu-BSJGQm dreamina-side-menu-container side-menu-QWfL3C visible-woMcUh\"><div role=\"menu\" class=\"lv-menu lv-menu-light lv-menu-vertical topMenu-Z7pITz\"><div class=\"lv-menu-inner\"><div tabindex=\"0\" role=\"menuitem\" class=\"lv-menu-item lv-m"
+
+2025-10-26T10:28:26.296 app[148e46eea2e168] iad [info] }
+
+2025-10-26T10:28:26.296 app[148e46eea2e168] iad [info] ✅ Login successful - creative tools detected
+
+2025-10-26T10:28:26.296 app[148e46eea2e168] iad [info] ✅ Background initialization complete - ready to generate images
+
+2025-10-26T10:29:02.626 app[148e46eea2e168] iad [info] Generating with Nano Banana: cute cat
+
+2025-10-26T10:29:02.626 app[148e46eea2e168] iad [info] Step 1: Navigating to /ai-tool/home page...
+
+2025-10-26T10:29:03.239 app[148e46eea2e168] iad [info] ✅ Loaded home page
+
+2025-10-26T10:29:06.263 app[148e46eea2e168] iad [info] Step 2: Clicking Create button...
+
+2025-10-26T10:29:08.988 app[148e46eea2e168] iad [info] ⚠️ Could not find Create button, assuming prompt input is already visible
+
+2025-10-26T10:29:08.989 app[148e46eea2e168] iad [info] Step 3: Entering prompt...
+
+2025-10-26T10:29:08.989 app[148e46eea2e168] iad [info] Prompt input attempt 1/5...
+
+2025-10-26T10:29:13.465 app[148e46eea2e168] iad [info] Prompt input not ready, retrying...
+
+2025-10-26T10:29:13.465 app[148e46eea2e168] iad [info] Prompt input attempt 2/5...
+
+2025-10-26T10:29:15.543 app[148e46eea2e168] iad [info] Prompt input not ready, retrying...
+
+2025-10-26T10:29:15.544 app[148e46eea2e168] iad [info] Prompt input attempt 3/5...
+
+2025-10-26T10:29:17.547 app[148e46eea2e168] iad [info] Prompt input not ready, retrying...
+
+2025-10-26T10:29:17.547 app[148e46eea2e168] iad [info] Prompt input attempt 4/5...
+
+2025-10-26T10:29:21.548 app[148e46eea2e168] iad [info] Prompt input not ready, retrying...
+
+2025-10-26T10:29:21.624 app[148e46eea2e168] iad [info] Prompt input attempt 5/5...
+
+2025-10-26T10:29:24.983 app[148e46eea2e168] iad [info] ❌ Generation error for prompt "cute cat": Could not find prompt input after 5 attempts

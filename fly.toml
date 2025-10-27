@@ -1,0 +1,27 @@
+# fly.toml app configuration file
+# See https://fly.io/docs/reference/configuration/ for more information
+
+app = 'dreamina-api'
+primary_region = 'iad'
+
+[build]
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ['app']
+
+  [[http_service.checks]]
+    grace_period = '60s'
+    interval = '30s'
+    method = 'GET'
+    timeout = '10s'
+    path = '/health'
+
+[[vm]]
+  memory = '1gb'
+  cpu_kind = 'shared'
+  cpus = 1
