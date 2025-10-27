@@ -493,33 +493,27 @@ async function generateImage(prompt, modelName) {
     }
   }
   
-  // Log current URL and navigate to generate page if needed
-  const urlAfterSubmit = page.url();
-  console.log(`URL after submit: ${urlAfterSubmit}`);
+  // Step 5.5: Wait for automatic redirect to generate page
+  console.log('Step 5.5: Waiting for redirect to generate page...');
   
-  // Step 5.5: Navigate to the generate page where images actually appear
-  if (!urlAfterSubmit.includes('/ai-tool/generate')) {
-    console.log('Step 5.5: Navigating to generate page...');
-    try {
-      // Wait for navigation to generate page (it might auto-redirect)
-      await Promise.race([
-        page.waitForNavigation({ timeout: 3000, waitUntil: 'networkidle0' }),
-        delay(3000)
-      ]);
-    } catch (navError) {
-      // If no auto-redirect, manually navigate
-      console.log('No auto-redirect detected, manually navigating to generate page...');
-      await page.goto('https://dreamina.capcut.com/ai-tool/generate', { 
-        waitUntil: 'networkidle0',
-        timeout: 10000 
-      });
-    }
+  // Poll the URL to wait for redirect to /ai-tool/generate
+  let redirected = false;
+  const maxRedirectWait = 10; // 10 seconds max
+  for (let i = 0; i < maxRedirectWait; i++) {
+    await delay(1000);
+    const currentUrl = page.url();
+    console.log(`[${i + 1}s] Current URL: ${currentUrl}`);
     
-    const finalUrl = page.url();
-    console.log(`✅ Now on generate page: ${finalUrl}`);
-    await delay(2000); // Wait for page to stabilize
-  } else {
-    console.log('✅ Already on generate page');
+    if (currentUrl.includes('/ai-tool/generate')) {
+      console.log(`✅ Redirected to generate page successfully`);
+      redirected = true;
+      await delay(2000); // Wait for page to stabilize
+      break;
+    }
+  }
+  
+  if (!redirected) {
+    throw new Error('Failed to redirect to generate page after submitting prompt. Page may have changed or submission failed.');
   }
   
   // Step 6: Wait for NEW generated images to appear
