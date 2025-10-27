@@ -360,9 +360,65 @@ async function generateImage(prompt, modelName) {
   
   console.log(`✅ Now on: ${page.url()}`);
   
-  // Step 2: Wait for any dynamic gallery images to load, THEN take baseline
-  console.log('Step 2: Taking baseline of existing images...');
-  await delay(5000); // Wait for any gallery/trending images to load
+  // Step 2: Select the model from dropdown
+  console.log(`Step 2: Selecting model: ${modelName}...`);
+  await delay(3000); // Wait for page to fully load
+  
+  const modelSelected = await page.evaluate((model) => {
+    // Look for model dropdown or selector
+    const buttons = Array.from(document.querySelectorAll('button, [role="button"], div[class*="select"], div[class*="dropdown"]'));
+    
+    for (const btn of buttons) {
+      const text = (btn.textContent || '').toLowerCase();
+      
+      // Look for model selector containing "AI Image" or the model names
+      if (text.includes('ai image') || text.includes('image 4') || text.includes('nano banana')) {
+        btn.click();
+        return { opened: true, text: btn.textContent };
+      }
+    }
+    
+    return { opened: false };
+  }, modelName);
+  
+  if (modelSelected.opened) {
+    console.log(`✅ Opened model selector: "${modelSelected.text}"`);
+    await delay(1500);
+    
+    // Now click the specific model
+    const modelClicked = await page.evaluate((model) => {
+      const options = Array.from(document.querySelectorAll('[role="option"], li, div[class*="option"], div[class*="item"]'));
+      
+      for (const opt of options) {
+        const text = (opt.textContent || '').trim();
+        
+        if (model === 'Nano Banana' && text.includes('Nano Banana')) {
+          opt.click();
+          return { clicked: true, text: text };
+        }
+        
+        if (model === 'Image 4.0' && (text.includes('Image 4.0') || text.includes('Image 4'))) {
+          opt.click();
+          return { clicked: true, text: text };
+        }
+      }
+      
+      return { clicked: false };
+    }, modelName);
+    
+    if (modelClicked.clicked) {
+      console.log(`✅ Selected model: "${modelClicked.text}"`);
+      await delay(2000);
+    } else {
+      console.log(`⚠️ Could not find model option for: ${modelName}`);
+    }
+  } else {
+    console.log(`⚠️ Could not find model selector, will try to continue...`);
+  }
+  
+  // Step 3: Wait for any dynamic gallery images to load, THEN take baseline
+  console.log('Step 3: Taking baseline of existing images...');
+  await delay(3000); // Wait for any gallery/trending images to load
   
   const existingImageUrls = await page.evaluate(() => {
     const imgs = Array.from(document.querySelectorAll('img'));
@@ -377,8 +433,8 @@ async function generateImage(prompt, modelName) {
   });
   console.log(`Found ${existingImageUrls.length} existing images (will exclude these from results)`);
   
-  // Step 3: Find and fill the prompt input
-  console.log('Step 3: Entering prompt and submitting...');
+  // Step 4: Find and fill the prompt input
+  console.log('Step 4: Entering prompt...');
   
   let promptFilled = null;
   const maxPromptRetries = 5;
@@ -465,12 +521,41 @@ async function generateImage(prompt, modelName) {
     throw new Error(`Could not find prompt input after ${maxPromptRetries} attempts`);
   }
   
-  await delay(1500); // Wait for input to be processed
+  await delay(2000); // Wait for input to be processed
   
-  // Step 5: Submit the prompt by pressing Enter (this will redirect to /ai-tool/generate)
-  console.log('Step 5: Pressing Enter to submit (will redirect to generate page)...');
-  await page.keyboard.press('Enter');
-  console.log('✅ Pressed Enter to submit');
+  // Step 5: Try to find and click the Generate button
+  console.log('Step 5: Looking for Generate/Create button...');
+  
+  const buttonClicked = await page.evaluate(() => {
+    const allElements = Array.from(document.querySelectorAll('button, [role="button"], div[class*="button"]'));
+    
+    for (const el of allElements) {
+      const text = (el.textContent || '').toLowerCase().trim();
+      
+      // Only click visible elements
+      if (el.offsetParent === null) continue;
+      
+      // Look for generate/create button (exact match preferred)
+      if (text === 'generate' || text === 'create' || text === '生成' ||
+          text.includes('generate') || text.includes('create')) {
+        el.click();
+        return { clicked: true, text: el.textContent };
+      }
+    }
+    
+    return { clicked: false };
+  });
+  
+  if (buttonClicked.clicked) {
+    console.log(`✅ Clicked button: "${buttonClicked.text}"`);
+    await delay(2000);
+  } else {
+    // Fallback: Press Enter
+    console.log('⚠️ No generate button found, trying Enter key...');
+    await page.keyboard.press('Enter');
+    console.log('✅ Pressed Enter to submit');
+    await delay(2000);
+  }
   
   // Step 5.5: Wait for automatic redirect to /ai-tool/generate
   console.log('Step 5.5: Waiting for automatic redirect to generate page...');
