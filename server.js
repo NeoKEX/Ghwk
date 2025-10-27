@@ -352,11 +352,11 @@ async function generateImage(prompt, modelName) {
   
   try {
     await page.goto('https://dreamina.capcut.com/ai-tool/generate', { 
-      waitUntil: 'domcontentloaded',
+      waitUntil: 'networkidle2',
       timeout: 30000 
     });
     console.log('✅ Loaded generate page');
-    await delay(3000);
+    await delay(5000); // Increased wait time for dynamic content
   } catch (navError) {
     console.log('⚠️ Navigation failed:', navError.message);
     throw new Error('Unable to load generate page');
@@ -368,9 +368,18 @@ async function generateImage(prompt, modelName) {
     const bodyText = document.body.textContent || '';
     const bodyHTML = document.body.innerHTML || '';
     
+    // Check for multiple input types
+    const hasTextarea = document.querySelector('textarea') !== null;
+    const hasContentEditable = document.querySelector('[contenteditable="true"]') !== null;
+    const hasInput = document.querySelector('input[type="text"]') !== null;
+    const hasAnyInput = hasTextarea || hasContentEditable || hasInput;
+    
     return {
       hasLoginButton: bodyText.includes('Log in') || bodyText.includes('Sign in'),
-      hasPromptInput: document.querySelector('textarea') !== null,
+      hasPromptInput: hasAnyInput,
+      hasTextarea,
+      hasContentEditable,
+      hasInput,
       hasCreateNav: bodyText.includes('Create') || bodyText.includes('Explore'),
       url: window.location.href,
       bodyPreview: bodyText.substring(0, 200)
@@ -384,12 +393,12 @@ async function generateImage(prompt, modelName) {
     throw new Error('Session expired or cookies invalid - not logged in on generate page');
   }
   
+  // Don't fail immediately - the input might load dynamically
   if (!loginCheck.hasPromptInput) {
-    console.log('❌ No prompt input found - page may not have loaded correctly');
-    throw new Error('Generate page did not load correctly - no prompt input found');
+    console.log('⚠️ No prompt input found yet - will retry during prompt entry');
+  } else {
+    console.log('✅ Confirmed logged in on generate page');
   }
-  
-  console.log('✅ Confirmed logged in on generate page');
   
   // Step 3: Wait for any dynamic gallery images to load, THEN take baseline
   console.log('Step 3: Waiting for dynamic content to fully load...');
@@ -413,7 +422,23 @@ async function generateImage(prompt, modelName) {
     console.log(`Prompt input attempt ${attempt}/${maxPromptRetries}...`);
     
     promptFilled = await page.evaluate((promptText) => {
-      // Find textarea with prompt placeholder
+      // 1. Try contenteditable elements first (modern web apps)
+      const contentEditables = document.querySelectorAll('[contenteditable="true"]');
+      for (const el of contentEditables) {
+        if (el.offsetParent !== null) {
+          el.focus();
+          el.textContent = promptText;
+          el.innerText = promptText;
+          
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+          el.dispatchEvent(new InputEvent('input', { bubbles: true, data: promptText }));
+          
+          return { success: true, element: 'contenteditable', text: el.textContent };
+        }
+      }
+      
+      // 2. Try textarea with prompt placeholder
       const textareas = document.querySelectorAll('textarea');
       for (const el of textareas) {
         const placeholder = (el.placeholder || '').toLowerCase();
@@ -421,12 +446,10 @@ async function generateImage(prompt, modelName) {
             placeholder.includes('imagine') || 
             placeholder.includes('prompt')) {
           
-          // Clear and set value
           el.value = '';
           el.focus();
           el.value = promptText;
           
-          // Trigger all necessary events
           el.dispatchEvent(new Event('input', { bubbles: true }));
           el.dispatchEvent(new Event('change', { bubbles: true }));
           
@@ -434,7 +457,7 @@ async function generateImage(prompt, modelName) {
         }
       }
       
-      // Fallback: any visible textarea
+      // 3. Try any visible textarea
       for (const el of textareas) {
         if (el.offsetParent !== null) {
           el.value = '';
@@ -443,6 +466,19 @@ async function generateImage(prompt, modelName) {
           el.dispatchEvent(new Event('input', { bubbles: true }));
           el.dispatchEvent(new Event('change', { bubbles: true }));
           return { success: true, element: 'textarea-fallback' };
+        }
+      }
+      
+      // 4. Try input[type="text"]
+      const inputs = document.querySelectorAll('input[type="text"]');
+      for (const el of inputs) {
+        if (el.offsetParent !== null) {
+          el.value = '';
+          el.focus();
+          el.value = promptText;
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+          return { success: true, element: 'input-text' };
         }
       }
       
