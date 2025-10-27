@@ -416,25 +416,8 @@ async function generateImage(prompt, modelName) {
     console.log(`⚠️ Could not find model selector, will try to continue...`);
   }
   
-  // Step 3: Wait for any dynamic gallery images to load, THEN take baseline
-  console.log('Step 3: Taking baseline of existing images...');
-  await delay(3000); // Wait for any gallery/trending images to load
-  
-  const existingImageUrls = await page.evaluate(() => {
-    const imgs = Array.from(document.querySelectorAll('img'));
-    return imgs
-      .map(img => {
-        const src = img.src || '';
-        const rect = img.getBoundingClientRect();
-        return { src, width: rect.width, height: rect.height };
-      })
-      .filter(data => data.src && data.src.startsWith('http') && data.width >= 100 && data.height >= 100)
-      .map(data => data.src);
-  });
-  console.log(`Found ${existingImageUrls.length} existing images (will exclude these from results)`);
-  
-  // Step 4: Find and fill the prompt input
-  console.log('Step 4: Entering prompt...');
+  // Step 3: Find and fill the prompt input
+  console.log('Step 3: Entering prompt...');
   
   let promptFilled = null;
   const maxPromptRetries = 5;
@@ -523,8 +506,8 @@ async function generateImage(prompt, modelName) {
   
   await delay(2000); // Wait for input to be processed
   
-  // Step 5: Try to find and click the Generate button
-  console.log('Step 5: Looking for Generate/Create button...');
+  // Step 4: Try to find and click the Generate button
+  console.log('Step 4: Looking for Generate/Create button...');
   
   const buttonClicked = await page.evaluate(() => {
     const allElements = Array.from(document.querySelectorAll('button, [role="button"], div[class*="button"]'));
@@ -557,8 +540,8 @@ async function generateImage(prompt, modelName) {
     await delay(2000);
   }
   
-  // Step 5.5: Wait for automatic redirect to /ai-tool/generate
-  console.log('Step 5.5: Waiting for automatic redirect to generate page...');
+  // Step 5: Wait for automatic redirect to /ai-tool/generate
+  console.log('Step 5: Waiting for automatic redirect to generate page...');
   
   let redirected = false;
   const maxRedirectWait = 10; // 10 seconds max
@@ -569,7 +552,7 @@ async function generateImage(prompt, modelName) {
     if (currentUrl.includes('/ai-tool/generate')) {
       console.log(`✅ Successfully redirected to: ${currentUrl}`);
       redirected = true;
-      await delay(2000); // Wait for page to stabilize
+      await delay(3000); // Wait for page to stabilize
       break;
     }
   }
@@ -579,30 +562,28 @@ async function generateImage(prompt, modelName) {
     throw new Error(`Failed to redirect to generate page. Still on: ${finalUrl}`);
   }
   
-  // Step 6: Wait for NEW generated images to appear on /ai-tool/generate
-  console.log('Step 6: Waiting for NEW generated images to appear (max 30 seconds)...');
-  console.log('Looking for 4 newly generated images...');
+  // Step 6: Wait for 4 generated images to appear on /ai-tool/generate page
+  console.log('Step 6: Waiting for 4 generated images to appear (max 60 seconds)...');
   
   let imageData = null;
-  const maxWaitTime = 30; // 30 seconds max (Dreamina generates in 15-20s)
-  const checkInterval = 2; // Check every 2 seconds
+  const maxWaitTime = 60; // 60 seconds max (generation can take time)
+  const checkInterval = 3; // Check every 3 seconds
   let imagesFound = false;
   
   for (let elapsed = 0; elapsed < maxWaitTime; elapsed += checkInterval) {
     await delay(checkInterval * 1000);
     
-    // Check for NEW generated images (exclude existing ones)
-    const checkResult = await page.evaluate((promptText, existingUrls) => {
+    // Check for 4 generated images on the page
+    const checkResult = await page.evaluate((promptText) => {
       const allImages = Array.from(document.querySelectorAll('img'));
       
-      // Filter for NEW large content images
-      const newContentImages = allImages.filter(img => {
+      // Look for large content images (generated images)
+      const contentImages = allImages.filter(img => {
         const src = img.src || '';
         const rect = img.getBoundingClientRect();
         
-        // Must be a valid HTTP URL and NOT in existing images
+        // Must be a valid HTTP URL
         if (!src || !src.startsWith('http')) return false;
-        if (existingUrls.includes(src)) return false;
         
         // Exclude UI elements
         if (src.includes('icon') || src.includes('logo') || 
@@ -617,59 +598,52 @@ async function generateImage(prompt, modelName) {
         return true;
       });
       
-      // Check for loading indicators (spinners, progress text)
+      // Check if the prompt text is visible on the page (confirms we're on the right generation)
       const bodyText = document.body.textContent || '';
+      const hasPrompt = bodyText.includes(promptText);
+      
+      // Check for loading/generating indicators
       const isGenerating = bodyText.includes('Generating') || 
                           bodyText.includes('Loading') ||
-                          bodyText.includes('%') ||
                           document.querySelector('[class*="loading"]') !== null ||
                           document.querySelector('[class*="spinner"]') !== null;
       
-      // Get URL info for debugging
       const currentUrl = window.location.href;
       
       return {
-        newImageCount: newContentImages.length,
+        imageCount: contentImages.length,
+        hasPrompt: hasPrompt,
         isGenerating: isGenerating,
-        totalImages: allImages.length,
         currentUrl: currentUrl
       };
-    }, prompt, existingImageUrls);
+    }, prompt);
     
-    console.log(`[${elapsed + checkInterval}s] NEW images: ${checkResult.newImageCount}, Total: ${checkResult.totalImages}, Generating: ${checkResult.isGenerating}, URL: ${checkResult.currentUrl}`);
+    console.log(`[${elapsed + checkInterval}s] Images: ${checkResult.imageCount}/4, Has prompt: ${checkResult.hasPrompt}, Generating: ${checkResult.isGenerating}, URL: ${checkResult.currentUrl}`);
     
-    // If we have 4+ NEW images AND generation indicators are gone, we're done
-    if (checkResult.newImageCount >= 4 && !checkResult.isGenerating) {
-      console.log(`✅ Generation complete! Found ${checkResult.newImageCount} NEW images`);
+    // Success: We have 4+ images, prompt is visible, and generation is done
+    if (checkResult.imageCount >= 4 && checkResult.hasPrompt && !checkResult.isGenerating) {
+      console.log(`✅ Generation complete! Found ${checkResult.imageCount} images`);
       imagesFound = true;
-      await delay(2000); // Wait a bit more for images to fully load
+      await delay(2000); // Wait for images to fully load
       break;
     }
   }
   
   if (!imagesFound) {
     console.log('⚠️ Timeout waiting for images, attempting to extract anyway...');
-    
-    // Debug: Take a screenshot to see what's on the page
-    try {
-      await page.screenshot({ path: '/tmp/generation-debug.png', fullPage: true });
-      console.log('📸 Full page screenshot saved to /tmp/generation-debug.png');
-    } catch (e) {
-      console.log('⚠️ Could not save debug screenshot');
-    }
   }
   
-  // Step 7: Extract ONLY the NEW generated image URLs
-  console.log('Step 7: Extracting NEW generated image URLs...');
+  // Step 7: Extract the 4 generated image URLs
+  console.log('Step 7: Extracting generated image URLs...');
   
-  imageData = await page.evaluate((promptText, existingUrls) => {
+  imageData = await page.evaluate((promptText) => {
     const allImages = Array.from(document.querySelectorAll('img'));
     
     // Debug: collect info about ALL images
     const debugInfo = [];
     
-    // Collect NEW large content images with their positions
-    const newContentImages = allImages
+    // Collect large content images (generated images) with their positions
+    const contentImages = allImages
       .map(img => {
         const src = img.src || '';
         const rect = img.getBoundingClientRect();
@@ -678,34 +652,23 @@ async function generateImage(prompt, modelName) {
       .filter(data => {
         const { src, rect } = data;
         
-        // Debug tracking
-        const debugReason = [];
-        
-        // Must be new (not in existing list)
+        // Must be valid HTTP URL
         if (!src || !src.startsWith('http')) {
-          debugReason.push('no-http-src');
-          return false;
-        }
-        if (existingUrls.includes(src)) {
-          debugReason.push('in-existing-list');
           return false;
         }
         
         // Exclude UI elements
         if (src.includes('icon') || src.includes('logo') || 
             src.includes('avatar') || src.includes('profile')) {
-          debugReason.push('ui-element');
           return false;
         }
         
-        // Must be reasonably sized and visible (lowered threshold from 180 to 100)
-        if (rect.width < 100 || rect.height < 100) {
-          debugReason.push(`too-small-${Math.round(rect.width)}x${Math.round(rect.height)}`);
-          debugInfo.push({ src: src.substring(0, 60), reason: debugReason.join(','), width: Math.round(rect.width), height: Math.round(rect.height) });
+        // Must be large (generated images are typically 200x200+)
+        if (rect.width < 180 || rect.height < 180) {
+          debugInfo.push({ src: src.substring(0, 60), reason: `too-small-${Math.round(rect.width)}x${Math.round(rect.height)}`, width: Math.round(rect.width), height: Math.round(rect.height) });
           return false;
         }
         if (rect.width === 0 || rect.height === 0) {
-          debugReason.push('not-visible');
           debugInfo.push({ src: src.substring(0, 60), reason: 'not-visible', width: 0, height: 0 });
           return false;
         }
@@ -716,58 +679,26 @@ async function generateImage(prompt, modelName) {
       });
     
     // Sort by Y position (top to bottom), then X position (left to right)
-    newContentImages.sort((a, b) => {
+    contentImages.sort((a, b) => {
       const yDiff = a.rect.top - b.rect.top;
       if (Math.abs(yDiff) > 50) return yDiff; // Different rows
       return a.rect.left - b.rect.left; // Same row, sort left to right
     });
     
-    // Group images by Y position to find images in the same row
-    const rows = [];
-    let currentRow = [];
-    let lastY = -1000;
-    
-    for (const imgData of newContentImages) {
-      if (Math.abs(imgData.rect.top - lastY) > 50) {
-        // New row
-        if (currentRow.length > 0) rows.push(currentRow);
-        currentRow = [imgData];
-        lastY = imgData.rect.top;
-      } else {
-        // Same row
-        currentRow.push(imgData);
-      }
-    }
-    if (currentRow.length > 0) rows.push(currentRow);
-    
-    // Find the first row with 4 images (the generated set)
-    let targetImages = [];
-    for (const row of rows) {
-      if (row.length === 4) {
-        targetImages = row;
-        break;
-      }
-    }
-    
-    // Fallback: if no row has exactly 4, take the first 4 NEW images
-    if (targetImages.length === 0 && newContentImages.length >= 4) {
-      targetImages = newContentImages.slice(0, 4);
-    }
-    
+    // Take the first 4 large images (these are the newly generated ones)
+    const targetImages = contentImages.slice(0, 4);
     const urls = targetImages.map(data => data.src);
     
     return {
       totalImages: allImages.length,
-      newImageCount: newContentImages.length,
-      rowCount: rows.length,
+      imageCount: contentImages.length,
       urls: urls,
-      foundInRow: targetImages.length === 4,
       debugInfo: debugInfo.slice(0, 10) // First 10 images for debugging
     };
-  }, prompt, existingImageUrls);
+  }, prompt);
   
-  console.log(`Found ${imageData.newImageCount} NEW images in ${imageData.rowCount} rows`);
-  console.log(`Extracted ${imageData.urls.length} image URLs (found in row: ${imageData.foundInRow})`);
+  console.log(`Found ${imageData.imageCount} images on page`);
+  console.log(`Extracted ${imageData.urls.length} image URLs`);
   
   // Debug output
   if (imageData.debugInfo && imageData.debugInfo.length > 0) {
