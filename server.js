@@ -347,13 +347,13 @@ async function generateImage(prompt, modelName) {
   
   console.log(`Generating with ${modelName}: ${prompt}`);
   
-  // Step 1: Navigate to the generate page where we enter prompts
-  console.log('Step 1: Navigating to generate page...');
+  // Step 1: Navigate to HOME page where we enter prompts
+  console.log('Step 1: Navigating to home page to enter prompt...');
   const currentUrl = page.url();
   console.log(`Current URL before navigation: ${currentUrl}`);
   
-  // Always navigate to the generate page to ensure we're on the right page
-  await page.goto('https://dreamina.capcut.com/ai-tool/generate', { 
+  // Navigate to the HOME page (not generate page)
+  await page.goto('https://dreamina.capcut.com/ai-tool/home', { 
     waitUntil: 'domcontentloaded',
     timeout: 30000 
   });
@@ -467,62 +467,34 @@ async function generateImage(prompt, modelName) {
   
   await delay(1500); // Wait for input to be processed
   
-  // Step 5: Submit the prompt - MUST find and click the generate button
-  console.log('Step 5: Looking for Generate button...');
+  // Step 5: Submit the prompt by pressing Enter (this will redirect to /ai-tool/generate)
+  console.log('Step 5: Pressing Enter to submit (will redirect to generate page)...');
+  await page.keyboard.press('Enter');
+  console.log('✅ Pressed Enter to submit');
   
-  let buttonClicked = false;
-  const maxButtonRetries = 5;
+  // Step 5.5: Wait for automatic redirect to /ai-tool/generate
+  console.log('Step 5.5: Waiting for automatic redirect to generate page...');
   
-  for (let attempt = 1; attempt <= maxButtonRetries; attempt++) {
-    console.log(`Button search attempt ${attempt}/${maxButtonRetries}...`);
+  let redirected = false;
+  const maxRedirectWait = 10; // 10 seconds max
+  for (let i = 0; i < maxRedirectWait; i++) {
+    await delay(1000);
+    const currentUrl = page.url();
     
-    const result = await page.evaluate(() => {
-      // Comprehensive button search
-      const allElements = Array.from(document.querySelectorAll('button, [role="button"], div[class*="button"], span[class*="button"]'));
-      
-      const buttonInfo = [];
-      
-      for (const el of allElements) {
-        const text = (el.textContent || '').toLowerCase().trim();
-        const ariaLabel = (el.getAttribute('aria-label') || '').toLowerCase();
-        const className = (el.className || '').toLowerCase();
-        
-        buttonInfo.push({ text, ariaLabel, className, visible: el.offsetParent !== null });
-        
-        // Only click visible buttons
-        if (el.offsetParent === null) continue;
-        
-        // Look for generate/create keywords
-        if (text.includes('generate') || text.includes('create') ||
-            text === '生成' || // Chinese for generate
-            ariaLabel.includes('generate') || ariaLabel.includes('create') ||
-            className.includes('generate') || className.includes('create')) {
-          el.click();
-          return { clicked: true, text: el.textContent, type: el.tagName };
-        }
-      }
-      
-      return { clicked: false, allButtons: buttonInfo.slice(0, 10) };
-    });
-    
-    if (result.clicked) {
-      console.log(`✅ Clicked ${result.type} button: "${result.text}"`);
-      buttonClicked = true;
-      await delay(3000); // Wait longer for submission to process
+    if (currentUrl.includes('/ai-tool/generate')) {
+      console.log(`✅ Successfully redirected to: ${currentUrl}`);
+      redirected = true;
+      await delay(2000); // Wait for page to stabilize
       break;
     }
-    
-    if (attempt < maxButtonRetries) {
-      console.log(`No generate button found yet. All buttons:`, JSON.stringify(result.allButtons, null, 2));
-      await delay(2000);
-    }
   }
   
-  if (!buttonClicked) {
-    throw new Error('Could not find Generate button after multiple attempts. Unable to submit prompt without causing redirect.');
+  if (!redirected) {
+    const finalUrl = page.url();
+    throw new Error(`Failed to redirect to generate page. Still on: ${finalUrl}`);
   }
   
-  // Step 6: Wait for NEW generated images to appear on THIS page
+  // Step 6: Wait for NEW generated images to appear on /ai-tool/generate
   console.log('Step 6: Waiting for NEW generated images to appear (max 30 seconds)...');
   console.log('Looking for 4 newly generated images...');
   
