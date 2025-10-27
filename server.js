@@ -347,20 +347,25 @@ async function generateImage(prompt, modelName) {
   
   console.log(`Generating with ${modelName}: ${prompt}`);
   
-  // Navigate - Dreamina will handle routing internally
-  console.log('Step 1: Navigating to Dreamina AI tool page...');
+  // Use client-side navigation to /ai-tool/generate to avoid redirects
+  console.log('Step 1: Navigating to /ai-tool/generate using client-side routing...');
   
   try {
-    // The page is already loaded from login, just wait for it to be ready
-    const currentUrl = page.url();
-    console.log(`Current URL: ${currentUrl}`);
+    // Use JavaScript to navigate within the SPA instead of page.goto
+    await page.evaluate(() => {
+      window.history.pushState({}, '', '/ai-tool/generate');
+      // Trigger a navigation event that the SPA framework will listen to
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    });
     
-    // Wait for the page to be fully interactive
     await delay(3000);
+    
+    const currentUrl = page.url();
+    console.log(`Current URL after client-side navigation: ${currentUrl}`);
     
     console.log('✅ Page ready for generation');
   } catch (navError) {
-    console.log('⚠️ Navigation check failed:', navError.message);
+    console.log('⚠️ Navigation failed:', navError.message);
     throw new Error('Unable to prepare page');
   }
   
@@ -542,19 +547,9 @@ async function generateImage(prompt, modelName) {
     }
   }
   
-  // Check if we were redirected and navigate back to generate page
+  // Log current URL but stay on whatever page we're on
   const urlAfterSubmit = page.url();
   console.log(`URL after submit: ${urlAfterSubmit}`);
-  
-  if (!urlAfterSubmit.includes('/ai-tool/generate')) {
-    console.log('Redirected away from generate page, navigating back...');
-    await page.goto('https://dreamina.capcut.com/ai-tool/generate', {
-      waitUntil: 'domcontentloaded',
-      timeout: 10000
-    });
-    await delay(2000);
-    console.log(`✅ Back on generate page: ${page.url()}`);
-  }
   
   // Step 6: Wait for NEW generated images to appear
   console.log('Step 6: Waiting for NEW generated images to appear (max 30 seconds)...');
