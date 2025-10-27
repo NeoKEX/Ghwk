@@ -347,11 +347,18 @@ async function generateImage(prompt, modelName) {
   
   console.log(`Generating with ${modelName}: ${prompt}`);
   
-  // Stay on the current page - we're already logged in from initialization
-  console.log('Step 1: Using current logged-in page...');
+  // Step 1: Navigate to the generate page where we enter prompts
+  console.log('Step 1: Navigating to generate page...');
   const currentUrl = page.url();
-  console.log(`Current URL: ${currentUrl}`);
-  console.log('✅ Ready to generate');
+  console.log(`Current URL before navigation: ${currentUrl}`);
+  
+  // Always navigate to the generate page to ensure we're on the right page
+  await page.goto('https://dreamina.capcut.com/ai-tool/generate', { 
+    waitUntil: 'domcontentloaded',
+    timeout: 30000 
+  });
+  
+  console.log(`✅ Now on: ${page.url()}`);
   
   // Step 2: Wait for any dynamic gallery images to load, THEN take baseline
   console.log('Step 2: Taking baseline of existing images...');
@@ -493,30 +500,7 @@ async function generateImage(prompt, modelName) {
     }
   }
   
-  // Step 5.5: Wait for automatic redirect to generate page
-  console.log('Step 5.5: Waiting for redirect to generate page...');
-  
-  // Poll the URL to wait for redirect to /ai-tool/generate
-  let redirected = false;
-  const maxRedirectWait = 10; // 10 seconds max
-  for (let i = 0; i < maxRedirectWait; i++) {
-    await delay(1000);
-    const currentUrl = page.url();
-    console.log(`[${i + 1}s] Current URL: ${currentUrl}`);
-    
-    if (currentUrl.includes('/ai-tool/generate')) {
-      console.log(`✅ Redirected to generate page successfully`);
-      redirected = true;
-      await delay(2000); // Wait for page to stabilize
-      break;
-    }
-  }
-  
-  if (!redirected) {
-    throw new Error('Failed to redirect to generate page after submitting prompt. Page may have changed or submission failed.');
-  }
-  
-  // Step 6: Wait for NEW generated images to appear
+  // Step 6: Wait for NEW generated images to appear on THIS page
   console.log('Step 6: Waiting for NEW generated images to appear (max 30 seconds)...');
   console.log('Looking for 4 newly generated images...');
   
