@@ -347,322 +347,23 @@ async function generateImage(prompt, modelName) {
   
   console.log(`Generating with ${modelName}: ${prompt}`);
   
-  // Check current page location
-  const currentUrl = page.url();
-  const isOnHomePage = currentUrl.includes('/ai-tool/home');
-  const isOnGeneratePage = currentUrl.includes('/ai-tool/generate');
+  // NEW APPROACH: Always go directly to the generate page
+  console.log('Step 1: Navigating directly to /ai-tool/generate page...');
   
-  // OPTIMIZATION: If we're on generate or home page, just reuse it (no navigation needed!)
-  if (isOnGeneratePage || isOnHomePage) {
-    console.log(`✅ Already on ${isOnGeneratePage ? 'generate' : 'home'} page, reusing (no navigation)`);
-    // Page is ready to use, no navigation needed
-  } else {
-    // We're on a different page - need to navigate to home
-    console.log('Step 1: Navigating to /ai-tool/home page...');
-    try {
-      await page.goto('https://dreamina.capcut.com/ai-tool/home', { 
-        waitUntil: 'domcontentloaded',
-        timeout: 45000 
-      });
-      console.log('✅ Loaded home page');
-      await delay(3000);
-    } catch (navError) {
-      console.log('Navigation to home failed:', navError.message);
-      // Try one more time with networkidle2
-      console.log('Retrying with networkidle2...');
-      try {
-        await page.goto('https://dreamina.capcut.com/ai-tool/home', { 
-          waitUntil: 'networkidle2',
-          timeout: 45000 
-        });
-        console.log('✅ Loaded home page (retry successful)');
-        await delay(3000);
-      } catch (retryError) {
-        console.log('Retry failed:', retryError.message);
-        throw new Error('Unable to load home page after 2 attempts');
-      }
-    }
-  }
-  
-  // Step 2: Find and fill the prompt input
-  console.log('Step 2: Entering prompt...');
-  
-  let promptFilled = null;
-  const maxPromptRetries = 8;
-  
-  for (let attempt = 1; attempt <= maxPromptRetries; attempt++) {
-    console.log(`Prompt input attempt ${attempt}/${maxPromptRetries}...`);
-    
-    // Debug: check what's on the page
-    const pageInfo = await page.evaluate(() => {
-      const textareas = document.querySelectorAll('textarea');
-      const inputs = document.querySelectorAll('input[type="text"], input:not([type])');
-      
-      return {
-        textareaCount: textareas.length,
-        textareaInfo: Array.from(textareas).map(t => ({
-          placeholder: t.placeholder || 'none',
-          visible: t.offsetParent !== null,
-          value: t.value
-        })),
-        inputCount: inputs.length,
-        pageLoaded: document.readyState
-      };
-    });
-    
-    console.log(`  Page info:`, JSON.stringify(pageInfo, null, 2));
-    
-    promptFilled = await page.evaluate((promptText) => {
-      // Strategy 1: Look for textarea with "Describe the image you're imagining" placeholder
-      const textareas = document.querySelectorAll('textarea');
-      for (const el of textareas) {
-        const placeholder = (el.placeholder || '').toLowerCase();
-        if (placeholder.includes('describe') || 
-            placeholder.includes('imagine') || 
-            placeholder.includes('prompt')) {
-          el.value = promptText;
-          el.focus();
-          el.dispatchEvent(new Event('input', { bubbles: true }));
-          el.dispatchEvent(new Event('change', { bubbles: true }));
-          el.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true }));
-          el.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));
-          return { success: true, method: 'textarea-with-placeholder', placeholder: el.placeholder };
-        }
-      }
-      
-      // Strategy 2: Look for any visible textarea (first one)
-      for (const el of textareas) {
-        if (el.offsetParent !== null) {
-          el.value = promptText;
-          el.focus();
-          el.dispatchEvent(new Event('input', { bubbles: true }));
-          el.dispatchEvent(new Event('change', { bubbles: true }));
-          el.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true }));
-          el.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));
-          return { success: true, method: 'first-visible-textarea' };
-        }
-      }
-      
-      // Strategy 3: Look for contenteditable div
-      const editableDivs = document.querySelectorAll('[contenteditable="true"]');
-      for (const el of editableDivs) {
-        if (el.offsetParent !== null) {
-          el.textContent = promptText;
-          el.focus();
-          el.dispatchEvent(new Event('input', { bubbles: true }));
-          return { success: true, method: 'contenteditable' };
-        }
-      }
-      
-      return { success: false };
-    }, prompt);
-    
-    if (promptFilled.success) {
-      console.log(`✅ Prompt entered using ${promptFilled.method}`);
-      break;
-    }
-    
-    if (attempt < maxPromptRetries) {
-      console.log('Prompt input not found, waiting 3 seconds...');
-      await delay(3000);
-    }
-  }
-  
-  if (!promptFilled || !promptFilled.success) {
-    throw new Error(`Could not find prompt input after ${maxPromptRetries} attempts`);
-  }
-  
-  await delay(1000);
-  
-  // Step 4: Select the model
-  console.log(`Step 4: Selecting model ${modelName}...`);
   try {
-    const modelSelected = await page.evaluate((model) => {
-      // Find and click on model selector dropdown (shows current model like "AI Image" or "Image 4.0")
-      const buttons = Array.from(document.querySelectorAll('button, div[role="button"]'));
-      
-      for (const btn of buttons) {
-        const text = btn.textContent || '';
-        // Look for model selector - it shows the current model name
-        if (text.includes('AI Image') || text.includes('Image 4') || text.includes('Nano Banana') ||
-            text.includes('Image 3') || text.includes('Image 2')) {
-          btn.click();
-          return { clicked: true };
-        }
-      }
-      return { clicked: false };
-    }, modelName);
-    
-    if (modelSelected.clicked) {
-      console.log('✅ Opened model dropdown');
-      await delay(1500);
-      
-      // Select the specific model from the dropdown
-      const modelClicked = await page.evaluate((model) => {
-        const options = Array.from(document.querySelectorAll('div, button, li'));
-        for (const opt of options) {
-          const text = opt.textContent || '';
-          if ((model.includes('Nano') && text.includes('Nano Banana')) ||
-              (model.includes('4') && text.includes('Image 4.0'))) {
-            opt.click();
-            return true;
-          }
-        }
-        return false;
-      }, modelName);
-      
-      if (modelClicked) {
-        console.log(`✅ Selected model: ${modelName}`);
-        await delay(2000);
-      } else {
-        console.log('⚠️ Could not select specific model, using default');
-      }
-    } else {
-      console.log('⚠️ Model dropdown not found, using default model');
-    }
-  } catch (modelError) {
-    console.log('⚠️ Model selection failed, using default:', modelError.message);
-  }
-  
-  // Step 5: Click the generate button (with proper event triggering)
-  console.log('Step 5: Clicking generate button...');
-  let generateClicked = false;
-  
-  // First, wait a bit to ensure prompt is fully processed
-  await delay(2000);
-  
-  for (let attempt = 1; attempt <= 5; attempt++) {
-    console.log(`Generate button click attempt ${attempt}/5...`);
-    
-    const clicked = await page.evaluate(() => {
-      const buttons = Array.from(document.querySelectorAll('button'));
-      
-      // Helper function to properly trigger click events
-      function triggerClick(element) {
-        // Focus first
-        element.focus();
-        
-        // Trigger mouse events in sequence
-        const events = ['mousedown', 'mouseup', 'click'];
-        events.forEach(eventType => {
-          const event = new MouseEvent(eventType, {
-            view: window,
-            bubbles: true,
-            cancelable: true
-          });
-          element.dispatchEvent(event);
-        });
-      }
-      
-      // Strategy 1: Look for button with arrow/send icon
-      for (const btn of buttons) {
-        const svg = btn.querySelector('svg');
-        const rect = btn.getBoundingClientRect();
-        
-        // Must have SVG icon and be visible
-        if (!svg || btn.offsetParent === null) continue;
-        
-        // Check if it's a small icon button (20-80px width)
-        if (rect.width < 20 || rect.width > 80) continue;
-        
-        // Must be on the right side of the screen
-        const isRightAligned = rect.right > window.innerWidth * 0.5;
-        
-        // Must be in the prompt area (not too high or low)
-        const isInPromptArea = rect.top > 100 && rect.top < 400;
-        
-        if (isRightAligned && isInPromptArea) {
-          triggerClick(btn);
-          return { success: true, method: 'arrow-icon-enhanced', disabled: btn.disabled };
-        }
-      }
-      
-      // Strategy 2: Look for button near image counter text
-      for (const btn of buttons) {
-        const parent = btn.parentElement;
-        if (!parent) continue;
-        
-        const nearbyText = parent.textContent || '';
-        if (nearbyText.includes('/image') || nearbyText.includes('0/')) {
-          triggerClick(btn);
-          return { success: true, method: 'near-counter', disabled: btn.disabled };
-        }
-      }
-      
-      // Strategy 3: Find rightmost small icon button in top area
-      const iconButtons = buttons.filter(btn => {
-        const svg = btn.querySelector('svg');
-        const rect = btn.getBoundingClientRect();
-        return svg && 
-               rect.width > 20 && 
-               rect.width < 80 && 
-               rect.top > 100 && 
-               rect.top < 400 &&
-               btn.offsetParent !== null;
-      });
-      
-      if (iconButtons.length > 0) {
-        // Sort by X position (rightmost first)
-        iconButtons.sort((a, b) => {
-          return b.getBoundingClientRect().right - a.getBoundingClientRect().right;
-        });
-        
-        triggerClick(iconButtons[0]);
-        return { success: true, method: 'rightmost-icon', disabled: iconButtons[0].disabled };
-      }
-      
-      return { success: false };
+    await page.goto('https://dreamina.capcut.com/ai-tool/generate', { 
+      waitUntil: 'domcontentloaded',
+      timeout: 30000 
     });
-    
-    if (clicked.success) {
-      console.log(`✅ Generate button clicked using ${clicked.method}${clicked.disabled ? ' (was disabled)' : ''}`);
-      generateClicked = true;
-      
-      // Wait a bit for click to process
-      await delay(2000);
-      break;
-    }
-    
-    if (attempt < 5) {
-      console.log('Generate button not found, waiting and retrying...');
-      await delay(3000);
-    }
+    console.log('✅ Loaded generate page');
+    await delay(3000); // Wait for page to fully render
+  } catch (navError) {
+    console.log('⚠️ Navigation failed:', navError.message);
+    throw new Error('Unable to load generate page');
   }
   
-  if (!generateClicked) {
-    throw new Error('Could not find generate button after 5 attempts');
-  }
-  
-  // Step 6: Wait for navigation to /ai-tool/generate page
-  console.log('Step 6: Waiting for navigation to /ai-tool/generate...');
-  
-  // Wait for URL to change to /ai-tool/generate (with retries)
-  let navigated = false;
-  const maxNavWait = 30; // 30 seconds max
-  
-  for (let i = 0; i < maxNavWait; i++) {
-    await delay(1000);
-    const currentUrl = page.url();
-    
-    if (currentUrl.includes('/ai-tool/generate')) {
-      console.log(`✅ Navigated to generate page after ${i + 1} seconds`);
-      navigated = true;
-      break;
-    }
-    
-    if (i % 5 === 0 && i > 0) {
-      console.log(`[${i}s] Still waiting for navigation... Current: ${currentUrl}`);
-    }
-  }
-  
-  if (!navigated) {
-    throw new Error('Failed to navigate to generation page - generation may not have started');
-  }
-  
-  await delay(3000); // Wait for page to settle and generation to start
-  
-  // Step 7: Track existing images BEFORE waiting (to identify NEW images)
-  console.log('Step 7: Recording existing images before generation...');
+  // Step 2: Track existing images BEFORE entering prompt (to detect new ones later)
+  console.log('Step 2: Recording existing images on the page...');
   const existingImageUrls = await page.evaluate(() => {
     const imgs = Array.from(document.querySelectorAll('img'));
     return imgs
@@ -671,13 +372,88 @@ async function generateImage(prompt, modelName) {
   });
   console.log(`Found ${existingImageUrls.length} existing images to exclude`);
   
-  // Step 8: Wait for NEW generated images to appear
-  console.log('Step 8: Waiting for NEW generated images to appear (max 60 seconds)...');
+  // Step 3: Find and fill the prompt input
+  console.log('Step 3: Entering prompt and submitting...');
+  
+  let promptFilled = null;
+  const maxPromptRetries = 5;
+  
+  for (let attempt = 1; attempt <= maxPromptRetries; attempt++) {
+    console.log(`Prompt input attempt ${attempt}/${maxPromptRetries}...`);
+    
+    promptFilled = await page.evaluate((promptText) => {
+      // Find textarea with prompt placeholder
+      const textareas = document.querySelectorAll('textarea');
+      for (const el of textareas) {
+        const placeholder = (el.placeholder || '').toLowerCase();
+        if (placeholder.includes('describe') || 
+            placeholder.includes('imagine') || 
+            placeholder.includes('prompt')) {
+          
+          // Clear and set value
+          el.value = '';
+          el.focus();
+          el.value = promptText;
+          
+          // Trigger all necessary events
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+          
+          return { success: true, element: 'textarea', placeholder: el.placeholder };
+        }
+      }
+      
+      // Fallback: any visible textarea
+      for (const el of textareas) {
+        if (el.offsetParent !== null) {
+          el.value = '';
+          el.focus();
+          el.value = promptText;
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+          return { success: true, element: 'textarea-fallback' };
+        }
+      }
+      
+      return { success: false };
+    }, prompt);
+    
+    if (promptFilled.success) {
+      console.log(`✅ Prompt entered successfully`);
+      break;
+    }
+    
+    if (attempt < maxPromptRetries) {
+      console.log('Prompt input not found, waiting 2 seconds...');
+      await delay(2000);
+    }
+  }
+  
+  if (!promptFilled || !promptFilled.success) {
+    throw new Error(`Could not find prompt input after ${maxPromptRetries} attempts`);
+  }
+  
+  await delay(1500); // Wait for input to be processed
+  
+  // Step 4: Submit the prompt using keyboard Enter
+  console.log('Step 4: Submitting prompt with Enter key...');
+  
+  try {
+    // Press Enter to submit (Ctrl+Enter or just Enter depending on the UI)
+    await page.keyboard.press('Enter');
+    console.log('✅ Pressed Enter to submit');
+    await delay(2000);
+  } catch (submitError) {
+    console.log('⚠️ Enter key submission failed, will wait for generation anyway');
+  }
+  
+  // Step 5: Wait for NEW generated images to appear
+  console.log('Step 5: Waiting for NEW generated images to appear (max 30 seconds)...');
   console.log('Looking for 4 newly generated images...');
   
   let imageData = null;
-  const maxWaitTime = 60; // 60 seconds max (Dreamina generates in 30-40s)
-  const checkInterval = 3; // Check every 3 seconds
+  const maxWaitTime = 30; // 30 seconds max (Dreamina generates in 15-20s)
+  const checkInterval = 2; // Check every 2 seconds
   let imagesFound = false;
   
   for (let elapsed = 0; elapsed < maxWaitTime; elapsed += checkInterval) {

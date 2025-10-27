@@ -16,14 +16,16 @@ This is a Node.js Express server that automates interactions with the Dreamina A
 - RESTful API interface
 
 ## Recent Changes
-- **October 27, 2025**: Major fix for image detection logic
-  - **NEW vs. EXISTING image tracking**: Now tracks existing images BEFORE generation starts, then only extracts NEW images
-  - **Removed manual navigation**: Eliminated manual navigation that was causing "Execution context destroyed" errors
-  - **Better generation detection**: Checks for loading indicators (spinners, "Generating" text) to confirm when generation is complete
-  - **Faster polling**: Reduced from 120s/5s intervals to 60s/3s intervals (Dreamina generates in 30-40s)
-  - **Stricter image filters**: Increased minimum image size from 150px to 180px to avoid false positives
-  - **Fixed infinite gallery bug**: Previous code was returning 36 old gallery images instead of the 4 newly generated ones
-  - **Extended navigation timeout**: Increased navigation wait from 20s to 30s for slower networks
+- **October 27, 2025**: Complete redesign of image generation automation (MUCH MORE RELIABLE!)
+  - **Direct navigation**: Now goes straight to `/ai-tool/generate` instead of `/ai-tool/home` → clicking buttons
+  - **Keyboard submission**: Uses Enter key to submit instead of clicking disabled buttons
+  - **Simpler flow**: Navigate → Fill prompt → Press Enter → Wait for images
+  - **Pre-tracking images**: Records existing images BEFORE generation to identify new ones accurately
+  - **Eliminated button clicking issues**: No more "button was disabled" or "navigation failed" errors
+  - **Faster & more reliable**: Reduced complexity from 10+ steps to just 4 simple steps
+  - **Better image detection**: Only extracts NEW images (not the 36 gallery images)
+  - **30-second timeout**: Optimized for Dreamina's actual 15-20 second generation time
+  - **Faster polling**: 2-second intervals instead of 3 seconds for quicker detection
 - **October 26, 2025**: Fixed navigation timeout issues for fly.io deployment
   - **Page reuse optimization**: Browser now reuses the current page (home or generate) instead of navigating on every request
   - **No unnecessary navigation**: Only navigates when starting from a different page
