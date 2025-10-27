@@ -347,93 +347,14 @@ async function generateImage(prompt, modelName) {
   
   console.log(`Generating with ${modelName}: ${prompt}`);
   
-  // Click on "Create" or "AI Image" to navigate to the generate page
-  console.log('Step 1: Clicking Create button to navigate to generate page...');
+  // Stay on the current page - we're already logged in from initialization
+  console.log('Step 1: Using current logged-in page...');
+  const currentUrl = page.url();
+  console.log(`Current URL: ${currentUrl}`);
+  console.log('✅ Ready to generate');
   
-  try {
-    const clicked = await page.evaluate(() => {
-      // Look for Create navigation button
-      const navButtons = Array.from(document.querySelectorAll('[role="menuitem"], button, a, div[class*="menu"]'));
-      
-      for (const btn of navButtons) {
-        const text = (btn.textContent || '').trim();
-        const ariaLabel = (btn.getAttribute('aria-label') || '');
-        
-        // Look for "Create" nav item
-        if (text === 'Create' || ariaLabel.includes('Create')) {
-          btn.click();
-          return { success: true, text: 'Create' };
-        }
-      }
-      
-      // If no Create button, look for "AI Image"
-      for (const btn of navButtons) {
-        const text = (btn.textContent || '').trim();
-        if (text.includes('AI Image')) {
-          btn.click();
-          return { success: true, text: 'AI Image' };
-        }
-      }
-      
-      return { success: false };
-    });
-    
-    if (clicked.success) {
-      console.log(`✅ Clicked "${clicked.text}" navigation`);
-      await delay(4000); // Wait for page to load
-    } else {
-      console.log('⚠️ Could not find Create button, staying on current page');
-      await delay(2000);
-    }
-    
-    const currentUrl = page.url();
-    console.log(`Current URL: ${currentUrl}`);
-    console.log('✅ Page ready for generation');
-  } catch (navError) {
-    console.log('⚠️ Navigation failed:', navError.message);
-    throw new Error('Unable to prepare page');
-  }
-  
-  // Step 2: Verify we're still logged in on this page
-  console.log('Step 2: Verifying login state on generate page...');
-  const loginCheck = await page.evaluate(() => {
-    const bodyText = document.body.textContent || '';
-    const bodyHTML = document.body.innerHTML || '';
-    
-    // Check for multiple input types
-    const hasTextarea = document.querySelector('textarea') !== null;
-    const hasContentEditable = document.querySelector('[contenteditable="true"]') !== null;
-    const hasInput = document.querySelector('input[type="text"]') !== null;
-    const hasAnyInput = hasTextarea || hasContentEditable || hasInput;
-    
-    return {
-      hasLoginButton: bodyText.includes('Log in') || bodyText.includes('Sign in'),
-      hasPromptInput: hasAnyInput,
-      hasTextarea,
-      hasContentEditable,
-      hasInput,
-      hasCreateNav: bodyText.includes('Create') || bodyText.includes('Explore'),
-      url: window.location.href,
-      bodyPreview: bodyText.substring(0, 200)
-    };
-  });
-  
-  console.log('Login check:', JSON.stringify(loginCheck, null, 2));
-  
-  if (loginCheck.hasLoginButton) {
-    console.log('❌ NOT LOGGED IN on generate page! Redirected to login.');
-    throw new Error('Session expired or cookies invalid - not logged in on generate page');
-  }
-  
-  // Don't fail immediately - the input might load dynamically
-  if (!loginCheck.hasPromptInput) {
-    console.log('⚠️ No prompt input found yet - will retry during prompt entry');
-  } else {
-    console.log('✅ Confirmed logged in on generate page');
-  }
-  
-  // Step 3: Wait for any dynamic gallery images to load, THEN take baseline
-  console.log('Step 3: Waiting for dynamic content to fully load...');
+  // Step 2: Wait for any dynamic gallery images to load, THEN take baseline
+  console.log('Step 2: Taking baseline of existing images...');
   await delay(5000); // Wait for any gallery/trending images to load
   
   const existingImageUrls = await page.evaluate(() => {
@@ -449,8 +370,8 @@ async function generateImage(prompt, modelName) {
   });
   console.log(`Found ${existingImageUrls.length} existing images (will exclude these from results)`);
   
-  // Step 4: Find and fill the prompt input
-  console.log('Step 4: Entering prompt and submitting...');
+  // Step 3: Find and fill the prompt input
+  console.log('Step 3: Entering prompt and submitting...');
   
   let promptFilled = null;
   const maxPromptRetries = 5;
