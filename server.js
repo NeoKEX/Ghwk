@@ -356,21 +356,23 @@ async function generateImage(prompt, modelName) {
       timeout: 30000 
     });
     console.log('✅ Loaded generate page');
-    await delay(3000); // Wait for page to fully render
+    await delay(2000);
   } catch (navError) {
     console.log('⚠️ Navigation failed:', navError.message);
     throw new Error('Unable to load generate page');
   }
   
-  // Step 2: Track existing images BEFORE entering prompt (to detect new ones later)
-  console.log('Step 2: Recording existing images on the page...');
+  // Step 2: Wait for gallery images to load, THEN take baseline
+  console.log('Step 2: Waiting for page gallery to fully load...');
+  await delay(5000); // Wait 5 seconds for trending/gallery images to load
+  
   const existingImageUrls = await page.evaluate(() => {
     const imgs = Array.from(document.querySelectorAll('img'));
     return imgs
       .map(img => img.src)
       .filter(src => src && src.startsWith('http'));
   });
-  console.log(`Found ${existingImageUrls.length} existing images to exclude`);
+  console.log(`Found ${existingImageUrls.length} existing gallery images (will exclude these from results)`);
   
   // Step 3: Find and fill the prompt input
   console.log('Step 3: Entering prompt and submitting...');
