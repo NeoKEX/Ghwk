@@ -201,7 +201,7 @@ async function loginToDreamina() {
     while (retries > 0 && !navigationSuccess) {
       try {
         console.log(`Navigation attempt ${4 - retries}/3 to Dreamina...`);
-        await page.goto('https://dreamina.capcut.com/ai-tool/home/', { 
+        await page.goto('https://dreamina.capcut.com/ai-tool/generate', { 
           waitUntil: 'domcontentloaded',
           timeout: 120000 
         });
