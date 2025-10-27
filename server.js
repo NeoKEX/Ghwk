@@ -502,16 +502,37 @@ async function generateImage(prompt, modelName) {
   
   await delay(1500); // Wait for input to be processed
   
-  // Step 5: Submit the prompt using keyboard Enter
-  console.log('Step 5: Submitting prompt with Enter key...');
+  // Step 5: Submit the prompt - try clicking the generate button first
+  console.log('Step 5: Looking for Generate button...');
   
-  try {
-    // Press Enter to submit (Ctrl+Enter or just Enter depending on the UI)
-    await page.keyboard.press('Enter');
-    console.log('✅ Pressed Enter to submit');
+  const buttonClicked = await page.evaluate(() => {
+    // Look for generate/create button
+    const buttons = Array.from(document.querySelectorAll('button, [role="button"]'));
+    for (const btn of buttons) {
+      const text = (btn.textContent || '').toLowerCase();
+      const ariaLabel = (btn.getAttribute('aria-label') || '').toLowerCase();
+      
+      if (text.includes('generate') || text.includes('create') || 
+          ariaLabel.includes('generate') || ariaLabel.includes('create')) {
+        btn.click();
+        return { clicked: true, text: btn.textContent };
+      }
+    }
+    return { clicked: false };
+  });
+  
+  if (buttonClicked.clicked) {
+    console.log(`✅ Clicked generate button: "${buttonClicked.text}"`);
     await delay(2000);
-  } catch (submitError) {
-    console.log('⚠️ Enter key submission failed, will wait for generation anyway');
+  } else {
+    console.log('⚠️ No generate button found, trying Enter key...');
+    try {
+      await page.keyboard.press('Enter');
+      console.log('✅ Pressed Enter to submit');
+      await delay(2000);
+    } catch (submitError) {
+      console.log('⚠️ Enter key submission failed');
+    }
   }
   
   // Step 6: Wait for NEW generated images to appear
@@ -530,7 +551,7 @@ async function generateImage(prompt, modelName) {
     const checkResult = await page.evaluate((promptText, existingUrls) => {
       const allImages = Array.from(document.querySelectorAll('img'));
       
-      // Filter for NEW large content images IN THE TOP SECTION ONLY
+      // Filter for NEW large content images
       const newContentImages = allImages.filter(img => {
         const src = img.src || '';
         const rect = img.getBoundingClientRect();
@@ -549,10 +570,6 @@ async function generateImage(prompt, modelName) {
         // Must be visible
         if (rect.width === 0 || rect.height === 0) return false;
         
-        // CRITICAL: Only count images in the TOP section (generated results area)
-        // This excludes the 36 gallery images below
-        if (rect.top > 600) return false;
-        
         return true;
       });
       
@@ -564,10 +581,14 @@ async function generateImage(prompt, modelName) {
                           document.querySelector('[class*="loading"]') !== null ||
                           document.querySelector('[class*="spinner"]') !== null;
       
+      // Get URL info for debugging
+      const currentUrl = window.location.href;
+      
       return {
         newImageCount: newContentImages.length,
         isGenerating: isGenerating,
-        totalImages: allImages.length
+        totalImages: allImages.length,
+        currentUrl: currentUrl
       };
     }, prompt, existingImageUrls);
     
@@ -584,6 +605,14 @@ async function generateImage(prompt, modelName) {
   
   if (!imagesFound) {
     console.log('⚠️ Timeout waiting for images, attempting to extract anyway...');
+    
+    // Debug: Take a screenshot to see what's on the page
+    try {
+      await page.screenshot({ path: '/tmp/generation-debug.png', fullPage: true });
+      console.log('📸 Full page screenshot saved to /tmp/generation-debug.png');
+    } catch (e) {
+      console.log('⚠️ Could not save debug screenshot');
+    }
   }
   
   // Step 7: Extract ONLY the NEW generated image URLs
@@ -591,6 +620,9 @@ async function generateImage(prompt, modelName) {
   
   imageData = await page.evaluate((promptText, existingUrls) => {
     const allImages = Array.from(document.querySelectorAll('img'));
+    
+    // Debug: collect info about ALL images
+    const debugInfo = [];
     
     // Collect NEW large content images with their positions
     const newContentImages = allImages
@@ -602,23 +634,39 @@ async function generateImage(prompt, modelName) {
       .filter(data => {
         const { src, rect } = data;
         
+        // Debug tracking
+        const debugReason = [];
+        
         // Must be new (not in existing list)
-        if (!src || !src.startsWith('http')) return false;
-        if (existingUrls.includes(src)) return false;
+        if (!src || !src.startsWith('http')) {
+          debugReason.push('no-http-src');
+          return false;
+        }
+        if (existingUrls.includes(src)) {
+          debugReason.push('in-existing-list');
+          return false;
+        }
         
         // Exclude UI elements
         if (src.includes('icon') || src.includes('logo') || 
-            src.includes('avatar') || src.includes('profile')) return false;
+            src.includes('avatar') || src.includes('profile')) {
+          debugReason.push('ui-element');
+          return false;
+        }
         
         // Must be large and visible
-        if (rect.width < 180 || rect.height < 180) return false;
-        if (rect.width === 0 || rect.height === 0) return false;
+        if (rect.width < 180 || rect.height < 180) {
+          debugReason.push(`too-small-${Math.round(rect.width)}x${Math.round(rect.height)}`);
+          debugInfo.push({ src: src.substring(0, 60), reason: debugReason.join(','), width: Math.round(rect.width), height: Math.round(rect.height) });
+          return false;
+        }
+        if (rect.width === 0 || rect.height === 0) {
+          debugReason.push('not-visible');
+          return false;
+        }
         
-        // CRITICAL: Only look at images in the TOP section of the page
-        // Generated images appear at the top, gallery images are below
-        // Limit to images in the top 600px of the viewport
-        if (rect.top > 600) return false;
-        
+        // This image passed all filters
+        debugInfo.push({ src: src.substring(0, 60), reason: 'PASSED', width: Math.round(rect.width), height: Math.round(rect.height) });
         return true;
       });
     
@@ -668,12 +716,21 @@ async function generateImage(prompt, modelName) {
       newImageCount: newContentImages.length,
       rowCount: rows.length,
       urls: urls,
-      foundInRow: targetImages.length === 4
+      foundInRow: targetImages.length === 4,
+      debugInfo: debugInfo.slice(0, 10) // First 10 images for debugging
     };
   }, prompt, existingImageUrls);
   
   console.log(`Found ${imageData.newImageCount} NEW images in ${imageData.rowCount} rows`);
   console.log(`Extracted ${imageData.urls.length} image URLs (found in row: ${imageData.foundInRow})`);
+  
+  // Debug output
+  if (imageData.debugInfo && imageData.debugInfo.length > 0) {
+    console.log('Image filter debug (first 10):');
+    imageData.debugInfo.forEach(info => {
+      console.log(`  ${info.src}... - ${info.width}x${info.height} - ${info.reason}`);
+    });
+  }
   
   if (imageData.urls.length === 0) {
     throw new Error('No NEW generated images found - generation may have failed');
