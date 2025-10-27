@@ -562,6 +562,20 @@ async function generateImage(prompt, modelName) {
     }
   }
   
+  // Check if we were redirected and navigate back to generate page
+  const urlAfterSubmit = page.url();
+  console.log(`URL after submit: ${urlAfterSubmit}`);
+  
+  if (!urlAfterSubmit.includes('/ai-tool/generate')) {
+    console.log('Redirected away from generate page, navigating back...');
+    await page.goto('https://dreamina.capcut.com/ai-tool/generate', {
+      waitUntil: 'domcontentloaded',
+      timeout: 10000
+    });
+    await delay(2000);
+    console.log(`✅ Back on generate page: ${page.url()}`);
+  }
+  
   // Step 6: Wait for NEW generated images to appear
   console.log('Step 6: Waiting for NEW generated images to appear (max 30 seconds)...');
   console.log('Looking for 4 newly generated images...');
