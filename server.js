@@ -467,37 +467,59 @@ async function generateImage(prompt, modelName) {
   
   await delay(1500); // Wait for input to be processed
   
-  // Step 5: Submit the prompt - try clicking the generate button first
+  // Step 5: Submit the prompt - MUST find and click the generate button
   console.log('Step 5: Looking for Generate button...');
   
-  const buttonClicked = await page.evaluate(() => {
-    // Look for generate/create button
-    const buttons = Array.from(document.querySelectorAll('button, [role="button"]'));
-    for (const btn of buttons) {
-      const text = (btn.textContent || '').toLowerCase();
-      const ariaLabel = (btn.getAttribute('aria-label') || '').toLowerCase();
-      
-      if (text.includes('generate') || text.includes('create') || 
-          ariaLabel.includes('generate') || ariaLabel.includes('create')) {
-        btn.click();
-        return { clicked: true, text: btn.textContent };
-      }
-    }
-    return { clicked: false };
-  });
+  let buttonClicked = false;
+  const maxButtonRetries = 5;
   
-  if (buttonClicked.clicked) {
-    console.log(`✅ Clicked generate button: "${buttonClicked.text}"`);
-    await delay(2000);
-  } else {
-    console.log('⚠️ No generate button found, trying Enter key...');
-    try {
-      await page.keyboard.press('Enter');
-      console.log('✅ Pressed Enter to submit');
-      await delay(2000);
-    } catch (submitError) {
-      console.log('⚠️ Enter key submission failed');
+  for (let attempt = 1; attempt <= maxButtonRetries; attempt++) {
+    console.log(`Button search attempt ${attempt}/${maxButtonRetries}...`);
+    
+    const result = await page.evaluate(() => {
+      // Comprehensive button search
+      const allElements = Array.from(document.querySelectorAll('button, [role="button"], div[class*="button"], span[class*="button"]'));
+      
+      const buttonInfo = [];
+      
+      for (const el of allElements) {
+        const text = (el.textContent || '').toLowerCase().trim();
+        const ariaLabel = (el.getAttribute('aria-label') || '').toLowerCase();
+        const className = (el.className || '').toLowerCase();
+        
+        buttonInfo.push({ text, ariaLabel, className, visible: el.offsetParent !== null });
+        
+        // Only click visible buttons
+        if (el.offsetParent === null) continue;
+        
+        // Look for generate/create keywords
+        if (text.includes('generate') || text.includes('create') ||
+            text === '生成' || // Chinese for generate
+            ariaLabel.includes('generate') || ariaLabel.includes('create') ||
+            className.includes('generate') || className.includes('create')) {
+          el.click();
+          return { clicked: true, text: el.textContent, type: el.tagName };
+        }
+      }
+      
+      return { clicked: false, allButtons: buttonInfo.slice(0, 10) };
+    });
+    
+    if (result.clicked) {
+      console.log(`✅ Clicked ${result.type} button: "${result.text}"`);
+      buttonClicked = true;
+      await delay(3000); // Wait longer for submission to process
+      break;
     }
+    
+    if (attempt < maxButtonRetries) {
+      console.log(`No generate button found yet. All buttons:`, JSON.stringify(result.allButtons, null, 2));
+      await delay(2000);
+    }
+  }
+  
+  if (!buttonClicked) {
+    throw new Error('Could not find Generate button after multiple attempts. Unable to submit prompt without causing redirect.');
   }
   
   // Step 6: Wait for NEW generated images to appear on THIS page
