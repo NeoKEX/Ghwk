@@ -524,49 +524,81 @@ async function generateImage(prompt, modelName) {
     console.log('⚠️ Model selection failed, using default:', modelError.message);
   }
   
-  // Step 5: Click the generate button (arrow icon next to "0/image")
+  // Step 5: Click the generate button (with proper event triggering)
   console.log('Step 5: Clicking generate button...');
   let generateClicked = false;
   
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    console.log(`Generate button click attempt ${attempt}/3...`);
+  // First, wait a bit to ensure prompt is fully processed
+  await delay(2000);
+  
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    console.log(`Generate button click attempt ${attempt}/5...`);
     
     const clicked = await page.evaluate(() => {
       const buttons = Array.from(document.querySelectorAll('button'));
       
-      // Strategy 1: Look for button with arrow icon (send/generate button)
+      // Helper function to properly trigger click events
+      function triggerClick(element) {
+        // Focus first
+        element.focus();
+        
+        // Trigger mouse events in sequence
+        const events = ['mousedown', 'mouseup', 'click'];
+        events.forEach(eventType => {
+          const event = new MouseEvent(eventType, {
+            view: window,
+            bubbles: true,
+            cancelable: true
+          });
+          element.dispatchEvent(event);
+        });
+      }
+      
+      // Strategy 1: Look for button with arrow/send icon
       for (const btn of buttons) {
         const svg = btn.querySelector('svg');
         const rect = btn.getBoundingClientRect();
         
-        // The generate button is typically an icon button on the right side
-        if (svg && rect.width > 20 && rect.width < 100 && btn.offsetParent !== null) {
-          // Check if it's positioned to the right (send button)
-          const isRightAligned = rect.right > window.innerWidth * 0.5;
-          if (isRightAligned) {
-            btn.click();
-            return { success: true, method: 'arrow-icon' };
-          }
+        // Must have SVG icon and be visible
+        if (!svg || btn.offsetParent === null) continue;
+        
+        // Check if it's a small icon button (20-80px width)
+        if (rect.width < 20 || rect.width > 80) continue;
+        
+        // Must be on the right side of the screen
+        const isRightAligned = rect.right > window.innerWidth * 0.5;
+        
+        // Must be in the prompt area (not too high or low)
+        const isInPromptArea = rect.top > 100 && rect.top < 400;
+        
+        if (isRightAligned && isInPromptArea) {
+          triggerClick(btn);
+          return { success: true, method: 'arrow-icon-enhanced', disabled: btn.disabled };
         }
       }
       
-      // Strategy 2: Look for button near "0/image" text
+      // Strategy 2: Look for button near image counter text
       for (const btn of buttons) {
         const parent = btn.parentElement;
         if (!parent) continue;
         
         const nearbyText = parent.textContent || '';
         if (nearbyText.includes('/image') || nearbyText.includes('0/')) {
-          btn.click();
-          return { success: true, method: 'near-counter' };
+          triggerClick(btn);
+          return { success: true, method: 'near-counter', disabled: btn.disabled };
         }
       }
       
-      // Strategy 3: Find the upload/send button icon (usually the rightmost icon button in the prompt area)
+      // Strategy 3: Find rightmost small icon button in top area
       const iconButtons = buttons.filter(btn => {
         const svg = btn.querySelector('svg');
         const rect = btn.getBoundingClientRect();
-        return svg && rect.width > 20 && rect.width < 80 && btn.offsetParent !== null;
+        return svg && 
+               rect.width > 20 && 
+               rect.width < 80 && 
+               rect.top > 100 && 
+               rect.top < 400 &&
+               btn.offsetParent !== null;
       });
       
       if (iconButtons.length > 0) {
@@ -575,27 +607,30 @@ async function generateImage(prompt, modelName) {
           return b.getBoundingClientRect().right - a.getBoundingClientRect().right;
         });
         
-        iconButtons[0].click();
-        return { success: true, method: 'rightmost-icon' };
+        triggerClick(iconButtons[0]);
+        return { success: true, method: 'rightmost-icon', disabled: iconButtons[0].disabled };
       }
       
       return { success: false };
     });
     
     if (clicked.success) {
-      console.log(`✅ Generate button clicked using ${clicked.method}`);
+      console.log(`✅ Generate button clicked using ${clicked.method}${clicked.disabled ? ' (was disabled)' : ''}`);
       generateClicked = true;
+      
+      // Wait a bit for click to process
+      await delay(2000);
       break;
     }
     
-    if (attempt < 3) {
+    if (attempt < 5) {
       console.log('Generate button not found, waiting and retrying...');
-      await delay(2000);
+      await delay(3000);
     }
   }
   
   if (!generateClicked) {
-    throw new Error('Could not find generate button after 3 attempts');
+    throw new Error('Could not find generate button after 5 attempts');
   }
   
   // Step 6: Wait for navigation to /ai-tool/generate page
