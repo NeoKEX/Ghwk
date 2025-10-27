@@ -347,41 +347,21 @@ async function generateImage(prompt, modelName) {
   
   console.log(`Generating with ${modelName}: ${prompt}`);
   
-  // NEW APPROACH: Navigate to generate page and ensure we stay there
-  console.log('Step 1: Navigating directly to /ai-tool/generate page...');
+  // Navigate - Dreamina will handle routing internally
+  console.log('Step 1: Navigating to Dreamina AI tool page...');
   
   try {
-    await page.goto('https://dreamina.capcut.com/ai-tool/generate', { 
-      waitUntil: 'domcontentloaded',
-      timeout: 30000 
-    });
-    console.log('✅ Initial navigation complete');
-    await delay(3000);
-    
-    // Check if we were redirected
+    // The page is already loaded from login, just wait for it to be ready
     const currentUrl = page.url();
     console.log(`Current URL: ${currentUrl}`);
     
-    if (!currentUrl.includes('/ai-tool/generate')) {
-      console.log('⚠️ Page redirected away from /ai-tool/generate, navigating back...');
-      await page.goto('https://dreamina.capcut.com/ai-tool/generate', { 
-        waitUntil: 'domcontentloaded',
-        timeout: 30000 
-      });
-      await delay(3000);
-      
-      const finalUrl = page.url();
-      console.log(`Final URL: ${finalUrl}`);
-      if (!finalUrl.includes('/ai-tool/generate')) {
-        console.log('⚠️ Still not on /ai-tool/generate, but continuing...');
-      }
-    }
+    // Wait for the page to be fully interactive
+    await delay(3000);
     
-    console.log('✅ Loaded generate page');
-    await delay(2000);
+    console.log('✅ Page ready for generation');
   } catch (navError) {
-    console.log('⚠️ Navigation failed:', navError.message);
-    throw new Error('Unable to load generate page');
+    console.log('⚠️ Navigation check failed:', navError.message);
+    throw new Error('Unable to prepare page');
   }
   
   // Step 2: Verify we're still logged in on this page
@@ -434,10 +414,10 @@ async function generateImage(prompt, modelName) {
         const rect = img.getBoundingClientRect();
         return { src, width: rect.width, height: rect.height };
       })
-      .filter(data => data.src && data.src.startsWith('http') && data.width >= 180 && data.height >= 180)
+      .filter(data => data.src && data.src.startsWith('http') && data.width >= 100 && data.height >= 100)
       .map(data => data.src);
   });
-  console.log(`Found ${existingImageUrls.length} existing large images (will exclude these from results)`);
+  console.log(`Found ${existingImageUrls.length} existing images (will exclude these from results)`);
   
   // Step 4: Find and fill the prompt input
   console.log('Step 4: Entering prompt and submitting...');
@@ -695,14 +675,15 @@ async function generateImage(prompt, modelName) {
           return false;
         }
         
-        // Must be large and visible
-        if (rect.width < 180 || rect.height < 180) {
+        // Must be reasonably sized and visible (lowered threshold from 180 to 100)
+        if (rect.width < 100 || rect.height < 100) {
           debugReason.push(`too-small-${Math.round(rect.width)}x${Math.round(rect.height)}`);
           debugInfo.push({ src: src.substring(0, 60), reason: debugReason.join(','), width: Math.round(rect.width), height: Math.round(rect.height) });
           return false;
         }
         if (rect.width === 0 || rect.height === 0) {
           debugReason.push('not-visible');
+          debugInfo.push({ src: src.substring(0, 60), reason: 'not-visible', width: 0, height: 0 });
           return false;
         }
         
