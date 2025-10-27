@@ -407,10 +407,15 @@ async function generateImage(prompt, modelName) {
   const existingImageUrls = await page.evaluate(() => {
     const imgs = Array.from(document.querySelectorAll('img'));
     return imgs
-      .map(img => img.src)
-      .filter(src => src && src.startsWith('http'));
+      .map(img => {
+        const src = img.src || '';
+        const rect = img.getBoundingClientRect();
+        return { src, width: rect.width, height: rect.height };
+      })
+      .filter(data => data.src && data.src.startsWith('http') && data.width >= 180 && data.height >= 180)
+      .map(data => data.src);
   });
-  console.log(`Found ${existingImageUrls.length} existing gallery images (will exclude these from results)`);
+  console.log(`Found ${existingImageUrls.length} existing large images (will exclude these from results)`);
   
   // Step 4: Find and fill the prompt input
   console.log('Step 4: Entering prompt and submitting...');
@@ -592,7 +597,7 @@ async function generateImage(prompt, modelName) {
       };
     }, prompt, existingImageUrls);
     
-    console.log(`[${elapsed + checkInterval}s] NEW images: ${checkResult.newImageCount}, Generating: ${checkResult.isGenerating}`);
+    console.log(`[${elapsed + checkInterval}s] NEW images: ${checkResult.newImageCount}, Total: ${checkResult.totalImages}, Generating: ${checkResult.isGenerating}, URL: ${checkResult.currentUrl}`);
     
     // If we have 4+ NEW images AND generation indicators are gone, we're done
     if (checkResult.newImageCount >= 4 && !checkResult.isGenerating) {
